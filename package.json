@@ -1,6 +1,7 @@
 {
-  "name": "ticket-store",
-  "version": "0.1.0",
+  "name": "site-stigma",
+  "version": "1.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +13,7 @@
     "dotenv": "^17.2.0",
     "mercadopago": "^2.8.0",
     "micro": "^10.0.1",
-    "mongodb": "^6.17.0",
+    "mongodb": "^6.18.0",
     "next": "15.3.5",
     "node-fetch": "^2.7.0",
     "nodemailer": "^7.0.5",

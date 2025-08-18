@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
-    'https://d2d3848ed3e2.ngrok-free.app'
+    'https://stigween.vercel.app'
   ],
 };
 
-module.exports = nextConfig;
+export default nextConfig;

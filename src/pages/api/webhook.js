@@ -1,5 +1,4 @@
 import { buffer } from "micro";
-import fetch from "node-fetch";
 import nodemailer from "nodemailer";
 import clientPromise from "../../lib/mongodb";
 
@@ -7,7 +6,9 @@ export const config = {
   api: { bodyParser: false },
 };
 
-// cria o transporter fora do handler para reuso e evitar recriação
+// ===========================
+// Configuração do transporter de e-mail
+// ===========================
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
@@ -18,162 +19,145 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ===========================
+// Função para envio de e-mail
+// ===========================
+async function sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends) {
+  const textEmail = `
+💰 Novo pagamento aprovado!
+
+ID do pagamento: ${paymentId}
+Status: approved
+Nome do pagador: ${payerName}
+E-mail do pagador: ${payerEmail}
+External Reference: ${externalReference}
+Amigos: ${buyerFriends.join(", ") || "nenhum"}
+  `.trim();
+
+  try {
+    await transporter.sendMail({
+      from: `"Stigween" <${process.env.SMTP_USER}>`,
+      to: process.env.CONFIRMATION_EMAIL_TO,
+      subject: `Pagamento aprovado - ${payerName}`,
+      text: textEmail,
+    });
+    console.log("[INFO] E-mail enviado para confirmação");
+  } catch (err) {
+    console.error("[ERROR] Falha ao enviar e-mail:", err);
+  }
+}
+
+// ===========================
+// Função para envio ao Google Sheets
+// ===========================
+async function sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now) {
+  try {
+    const sheetsRes = await fetch(process.env.SHEETS_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: payerName,
+        email: payerEmail,
+        externalReference,
+        friends: buyerFriends,
+        paymentDate: now.toISOString(),
+      }),
+    });
+
+    if (!sheetsRes.ok) {
+      const errText = await sheetsRes.text().catch(() => "Erro ao ler resposta do Sheets");
+      console.error("[ERROR] Google Sheets:", errText);
+    } else {
+      console.log("[INFO] Dados enviados ao Google Sheets");
+    }
+  } catch (err) {
+    console.error("[ERROR] Falha ao enviar para Google Sheets:", err);
+  }
+}
+
+// ===========================
+// Webhook handler
+// ===========================
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    console.warn("[WARN] Método inválido:", req.method);
     return res.status(405).json({ error: "Método não permitido" });
-  }
-
-  let bodyRaw;
-  try {
-    bodyRaw = (await buffer(req)).toString();
-  } catch (err) {
-    console.error("[ERROR] Falha ao ler body:", err);
-    return res.status(400).json({ error: "Falha ao ler body" });
   }
 
   let body;
   try {
-    body = JSON.parse(bodyRaw);
-  } catch (err) {
-    console.error("[ERROR] Body inválido:", err);
+    body = JSON.parse((await buffer(req)).toString());
+  } catch {
     return res.status(400).json({ error: "JSON inválido" });
   }
 
-  const paymentId =
-    req.query.id ||
-    req.query["data.id"] ||
-    body?.data?.id ||
-    body?.id ||
-    null;
+  const paymentId = body?.id;
+  const payerEmail = body?.payer?.email;
+  const payerFirstName = body?.payer?.first_name || "";
+  const payerLastName = body?.payer?.last_name || "";
+  const externalReference = body?.external_reference || "";
+  const metadata = body?.metadata || {};
 
-  if (!paymentId) {
-    console.error("[ERROR] Payment ID ausente");
-    return res.status(400).json({ error: "Payment ID ausente" });
+  if (!paymentId || !payerEmail) {
+    return res.status(400).json({ error: "Campos obrigatórios faltando" });
   }
 
-  console.log("[INFO] Webhook recebido:", { paymentId, query: req.query });
+  const paymentStatus = body?.status || "approved";
+  const payerName = `${payerFirstName} ${payerLastName}`.trim();
 
+  let buyerFriends = [];
   try {
-    const mpToken = process.env.MP_ACCESS_TOKEN;
-
-    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${mpToken}` },
-    });
-
-    if (!mpRes.ok) {
-      const text = await mpRes.text();
-      console.error("[ERROR] MercadoPago fetch:", text);
-      return res.status(502).json({ error: "Falha ao consultar pagamento" });
-    }
-
-    const payment = await mpRes.json();
-
-    console.log("[INFO] Pagamento retornado:", payment);
-
-    const {
-      status,
-      payer: {
-        email: payerEmail = "não informado",
-        first_name = "",
-        last_name = "",
-      } = {},
-      external_reference = "não informado",
-      metadata = {},
-    } = payment;
-
-    const payerName = `${first_name} ${last_name}`.trim() || "não informado";
-
-    let buyerFriends = [];
-    if (metadata.buyer_friends) {
-      try {
-        const parsed = JSON.parse(metadata.buyer_friends);
-        if (Array.isArray(parsed)) buyerFriends = parsed;
-      } catch {
-        console.warn("[WARN] buyer_friends inválido");
-      }
-    }
-
-    const now = new Date();
-
-    // salva no mongo
-    try {
-      const db = (await clientPromise).db();
-      await db.collection("pagamentos").updateOne(
-        { paymentId },
-        {
-          $set: {
-            status,
-            payerEmail,
-            payerName,
-            externalReference,
-            metadata,
-            updatedAt: now,
-          },
-          $setOnInsert: { createdAt: now },
-        },
-        { upsert: true }
-      );
-      console.log("[INFO] Pagamento salvo no MongoDB");
-    } catch (err) {
-      console.error("[ERROR] MongoDB:", err);
-    }
-
-    // só envia e-mail e sheets se aprovado
-    if (status === "approved") {
-      const textEmail = `
-💰 Novo pagamento aprovado!
-
-ID do pagamento: ${paymentId}
-Status: ${status}
-Nome do pagador: ${payerName}
-E-mail do pagador: ${payerEmail}
-External Reference: ${external_reference}
-
-Amigos: ${buyerFriends.join(", ") || "nenhum"}
-      `.trim();
-
-      try {
-        await transporter.sendMail({
-          from: `"Stigween" <${process.env.SMTP_USER}>`,
-          to: process.env.CONFIRMATION_EMAIL_TO,
-          subject: `Pagamento aprovado - ${payerName}`,
-          text: textEmail,
-        });
-        console.log("[INFO] E-mail enviado");
-      } catch (err) {
-        console.error("[ERROR] E-mail:", err);
-      }
-
-      try {
-        const sheetsRes = await fetch(process.env.SHEETS_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: payerName,
-            email: payerEmail,
-            externalReference: external_reference,
-            friends: buyerFriends,
-            paymentDate: now.toISOString(),
-          }),
-        });
-
-        if (!sheetsRes.ok) {
-          const errText = await sheetsRes.text();
-          console.error("[ERROR] Google Sheets:", errText);
-        } else {
-          console.log("[INFO] Dados enviados ao Google Sheets");
-        }
-      } catch (err) {
-        console.error("[ERROR] Google Sheets fetch:", err);
-      }
-    } else {
-      console.log("[INFO] Status não aprovado:", status);
-    }
-
-    return res.status(200).json({ message: "Processado", status });
-  } catch (err) {
-    console.error("[ERROR] Geral:", err);
-    return res.status(500).json({ error: "Erro interno" });
+    const parsed = JSON.parse(metadata.buyer_friends || "[]");
+    if (Array.isArray(parsed)) buyerFriends = parsed;
+  } catch {
+    console.warn("[WARN] buyer_friends inválido");
   }
+
+  if (paymentStatus !== "approved") {
+    console.log(`[INFO] Pagamento não aprovado, ignorando. Status: ${paymentStatus}`);
+    return res.status(200).json({ message: "Ignorado", status: paymentStatus });
+  }
+
+  console.log("[INFO] Pagamento aprovado:", { paymentId, payerName, externalReference });
+
+  const now = new Date();
+
+  // ===========================
+  // Salva no MongoDB
+  // ===========================
+  try {
+    const db = (await clientPromise).db();
+    const existing = await db.collection("pagamentos").findOne({ paymentId });
+
+    if (existing?.status === "approved") {
+      console.log("[INFO] Pagamento já processado, ignorando duplicado:", paymentId);
+      return res.status(200).json({ message: "Duplicado ignorado", status: existing.status });
+    }
+
+    await db.collection("pagamentos").updateOne(
+      { paymentId },
+      {
+        $set: {
+          status: paymentStatus,
+          payerEmail,
+          payerName,
+          externalReference,
+          metadata,
+          updatedAt: now,
+        },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true }
+    );
+    console.log("[INFO] Pagamento salvo no MongoDB");
+  } catch (err) {
+    console.error("[ERROR] MongoDB:", err);
+  }
+
+  // ===========================
+  // Envia notificações
+  // ===========================
+  await sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends);
+  await sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now);
+
+  return res.status(200).json({ message: "Processado", paymentId, status: paymentStatus });
 }

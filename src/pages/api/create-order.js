@@ -13,26 +13,19 @@ export default async function handler(req, res) {
 
   // Validação rigorosa
   if (
-    !title ||
-    typeof title !== "string" ||
-    !quantity ||
-    typeof quantity !== "number" ||
-    quantity < 1 ||
-    !price ||
-    typeof price !== "number" ||
-    price <= 0 ||
-    !names ||
-    !Array.isArray(names) ||
-    names.length === 0 ||
-    !email ||
-    typeof email !== "string"
+    !title || typeof title !== "string" ||
+    !quantity || typeof quantity !== "number" || quantity < 1 ||
+    !price || typeof price !== "number" || price <= 0 ||
+    !names || !Array.isArray(names) || names.length === 0 ||
+    !email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   ) {
     console.warn("⚠️ Dados inválidos ou incompletos:", req.body);
     return res.status(400).json({ error: "Dados inválidos ou incompletos" });
   }
 
   try {
-    const payerName = names.join(", ");
+    // Concatena nomes e garante UTF-8 seguro
+    const payerName = names.map(n => String(n)).join(", ");
 
     console.log(`📦 Criando preferência para: ${payerName} <${email}>`);
 
@@ -50,12 +43,12 @@ export default async function handler(req, res) {
           name: payerName,
           email,
         },
-       back_urls: {
-  success: "https://sitgween.vercel.app/?status=success",
-  failure: "https://sitgween.vercel.app/?status=failure",
-  pending: "https://sitgween.vercel.app/?status=pending"
-},
-        notification_url: "https://sitgween.vercel.app/api/webhook",
+        back_urls: {
+          success: "https://stigween.vercel.app/?status=success",
+          failure: "https://stigween.vercel.app/?status=failure",
+          pending: "https://stigween.vercel.app/?status=pending"
+        },
+        notification_url: "https://stigween.vercel.app/api/webhook",
         auto_return: "approved",
         metadata: {
           buyer_friends: JSON.stringify(names),
@@ -71,6 +64,7 @@ export default async function handler(req, res) {
 
     console.log(`✅ Preferência criada: ${result.id}`);
 
+    // Retorna apenas dados seguros para o front-end
     return res.status(200).json({
       init_point: result.init_point,
       preference_id: result.id,

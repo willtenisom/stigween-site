@@ -1,27 +1,25 @@
-// src/lib/mongodb.js
 import { MongoClient } from "mongodb";
-import 'dotenv/config';
 
+const uri = process.env.MONGODB_URI;
+if (!uri) throw new Error("Por favor defina MONGODB_URI no .env");
 
-const uri = process.env.MONGODB_URI; // sua URI do MongoDB Atlas, coloque no .env.local
-const options = {};
+const options = {
+  // SSL obrigatório para produção
+  ssl: true,
+};
 
 let client;
 let clientPromise;
 
-if (!uri) {
-  throw new Error("Por favor defina a variável MONGODB_URI no .env.local");
-}
-
 if (process.env.NODE_ENV === "development") {
-  // Em dev, usamos uma variável global para evitar múltiplas conexões no hot reload
+  // Para dev local, às vezes o Windows/Node dá problemas de SSL
   if (!global._mongoClientPromise) {
-    client = new MongoClient(uri, options);
+    client = new MongoClient(uri, { ...options, tlsAllowInvalidCertificates: true });
     global._mongoClientPromise = client.connect();
   }
   clientPromise = global._mongoClientPromise;
 } else {
-  // Em produção, conexão simples
+  // Produção: TLS/SSL normal, sem ignorar certificados
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
