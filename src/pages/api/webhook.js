@@ -6,9 +6,7 @@ export const config = {
   api: { bodyParser: false },
 };
 
-// ===========================
 // Configuração do transporter de e-mail
-// ===========================
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
@@ -19,9 +17,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ===========================
 // Função para envio de e-mail
-// ===========================
 async function sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends) {
   const textEmail = `
 💰 Novo pagamento aprovado!
@@ -47,9 +43,7 @@ Amigos: ${buyerFriends.join(", ") || "nenhum"}
   }
 }
 
-// ===========================
 // Função para envio ao Google Sheets
-// ===========================
 async function sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now) {
   try {
     const sheetsRes = await fetch(process.env.SHEETS_WEBHOOK_URL, {
@@ -75,9 +69,7 @@ async function sendToSheets(paymentId, payerName, payerEmail, externalReference,
   }
 }
 
-// ===========================
 // Webhook handler
-// ===========================
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
@@ -90,18 +82,40 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "JSON inválido" });
   }
 
-  const paymentId = body?.id;
-  const payerEmail = body?.payer?.email;
-  const payerFirstName = body?.payer?.first_name || "";
-  const payerLastName = body?.payer?.last_name || "";
-  const externalReference = body?.external_reference || "";
-  const metadata = body?.metadata || {};
-
-  if (!paymentId || !payerEmail) {
+  // Agora suporta ambos os formatos: body.data.id (Postman) ou body.id (MP real)
+  const paymentId = body?.data?.id || body?.id;
+  if (!paymentId) {
     return res.status(400).json({ error: "Campos obrigatórios faltando" });
   }
 
-  const paymentStatus = body?.status || "approved";
+  console.log("[INFO] Webhook recebido, buscando detalhes do pagamento:", paymentId);
+
+  // ===========================
+  // Busca detalhes do pagamento no Mercado Pago
+  // ===========================
+  let payment;
+  try {
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` },
+    });
+    payment = await mpRes.json();
+
+    if (!payment?.id) {
+      console.error("[ERROR] Pagamento não encontrado no MP:", paymentId);
+      return res.status(404).json({ error: "Pagamento não encontrado" });
+    }
+  } catch (err) {
+    console.error("[ERROR] Falha ao buscar pagamento no MP:", err);
+    return res.status(500).json({ error: "Erro ao buscar pagamento" });
+  }
+
+  const payerEmail = payment?.payer?.email;
+  const payerFirstName = payment?.payer?.first_name || "";
+  const payerLastName = payment?.payer?.last_name || "";
+  const externalReference = payment?.external_reference || "";
+  const metadata = payment?.metadata || {};
+  const paymentStatus = payment?.status;
+
   const payerName = `${payerFirstName} ${payerLastName}`.trim();
 
   let buyerFriends = [];
@@ -116,8 +130,6 @@ export default async function handler(req, res) {
     console.log(`[INFO] Pagamento não aprovado, ignorando. Status: ${paymentStatus}`);
     return res.status(200).json({ message: "Ignorado", status: paymentStatus });
   }
-
-  console.log("[INFO] Pagamento aprovado:", { paymentId, payerName, externalReference });
 
   const now = new Date();
 
