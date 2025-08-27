@@ -19,6 +19,10 @@ const transporter = nodemailer.createTransport({
 
 // Função para envio de e-mail
 async function sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends) {
+  const friendsList = buyerFriends.filter(
+    (friend) => friend.trim().toLowerCase() !== payerName.trim().toLowerCase()
+  );
+
   const textEmail = `
 💰 Novo pagamento aprovado!
 
@@ -27,7 +31,7 @@ Status: approved
 Nome do pagador: ${payerName}
 E-mail do pagador: ${payerEmail}
 External Reference: ${externalReference}
-Amigos: ${buyerFriends.join(", ") || "nenhum"}
+Amigos: ${friendsList.length > 0 ? friendsList.join(", ") : "nenhum"}
   `.trim();
 
   try {
@@ -45,6 +49,10 @@ Amigos: ${buyerFriends.join(", ") || "nenhum"}
 
 // Função para envio ao Google Sheets
 async function sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now) {
+  const friendsList = buyerFriends.filter(
+    (friend) => friend.trim().toLowerCase() !== payerName.trim().toLowerCase()
+  );
+
   try {
     const sheetsRes = await fetch(process.env.SHEETS_WEBHOOK_URL, {
       method: "POST",
@@ -53,7 +61,7 @@ async function sendToSheets(paymentId, payerName, payerEmail, externalReference,
         name: payerName,
         email: payerEmail,
         externalReference,
-        friends: buyerFriends,
+        friends: friendsList,
         paymentDate: now.toISOString(),
       }),
     });
@@ -82,7 +90,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "JSON inválido" });
   }
 
-  // Agora suporta ambos os formatos: body.data.id (Postman) ou body.id (MP real)
+  // Suporta body.data.id (Postman) ou body.id (MP real)
   const paymentId = body?.data?.id || body?.id;
   if (!paymentId) {
     return res.status(400).json({ error: "Campos obrigatórios faltando" });
@@ -90,9 +98,7 @@ export default async function handler(req, res) {
 
   console.log("[INFO] Webhook recebido, buscando detalhes do pagamento:", paymentId);
 
-  // ===========================
   // Busca detalhes do pagamento no Mercado Pago
-  // ===========================
   let payment;
   try {
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
@@ -133,9 +139,7 @@ export default async function handler(req, res) {
 
   const now = new Date();
 
-  // ===========================
   // Salva no MongoDB
-  // ===========================
   try {
     const db = (await clientPromise).db();
     const existing = await db.collection("pagamentos").findOne({ paymentId });
@@ -165,9 +169,7 @@ export default async function handler(req, res) {
     console.error("[ERROR] MongoDB:", err);
   }
 
-  // ===========================
   // Envia notificações
-  // ===========================
   await sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends);
   await sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now);
 
