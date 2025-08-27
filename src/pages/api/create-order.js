@@ -11,7 +11,6 @@ export default async function handler(req, res) {
 
   const { title, quantity, price, names, email, clientId } = req.body ?? {};
 
-  // Validação rigorosa
   if (
     !title || typeof title !== "string" ||
     !quantity || typeof quantity !== "number" || quantity < 1 ||
@@ -24,21 +23,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Concatena nomes e garante UTF-8 seguro
     const payerName = names.map(n => String(n)).join(", ");
 
     console.log(`📦 Criando preferência para: ${payerName} <${email}>`);
 
     const result = await preference.create({
       body: {
-        items: [
-          {
-            title,
-            quantity,
-            unit_price: price,
-            currency_id: "BRL",
-          },
-        ],
+       items: [
+    {
+        title,
+         quantity: 1, 
+         unit_price: price,
+         urrency_id: "BRL",
+     },
+   ],
         payer: {
           name: payerName,
           email,
@@ -64,7 +62,7 @@ export default async function handler(req, res) {
 
     console.log(`✅ Preferência criada: ${result.id}`);
 
-    // Retorna apenas dados seguros para o front-end
+    
     return res.status(200).json({
       init_point: result.init_point,
       preference_id: result.id,
