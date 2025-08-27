@@ -21,12 +21,21 @@ export default function Home() {
   const [ticketNames, setTicketNames] = useState([""]);
   const [paymentId, setPaymentId] = useState(null);
 
-  // Gera um clientId único uma vez
   const clientId = useRef(uuidv4());
 
   const leftEyeRef = useRef(null);
   const rightEyeRef = useRef(null);
   const meowAudio = useRef(null);
+
+  
+  const firstLotPrice = 70; 
+  const couplePrice = 130;  
+
+  const calculatePrice = (quantity) => {
+    if (quantity === 1) return firstLotPrice;
+    if (quantity % 2 === 0) return (quantity / 2) * couplePrice;
+    return Math.floor(quantity / 2) * couplePrice + firstLotPrice;
+  };
 
   useEffect(() => {
     meowAudio.current = new Audio("/cat-meow.mp3");
@@ -112,7 +121,6 @@ export default function Home() {
 
   const closeNotification = () => setPaymentStatus(null);
 
-  // Aqui enviamos o clientId único junto ao pedido
   const handlePayment = async (e) => {
     e.preventDefault();
 
@@ -126,10 +134,10 @@ export default function Home() {
         body: JSON.stringify({
           title: "Ingresso Stigween",
           quantity: ticketCount,
-          price: 54.99,
+          price: calculatePrice(ticketCount), // preço atualizado
           email,
           names: ticketNames,
-          clientId: clientId.current, // envia o clientId único
+          clientId: clientId.current,
         }),
       });
       if (!res.ok) throw new Error("Erro ao criar preferência");
@@ -184,7 +192,6 @@ export default function Home() {
     return "";
   };
 
-  // Opcional: consulta status periodicamente se pendente
   useEffect(() => {
     if (!paymentId || !clientId.current) return;
 
@@ -197,12 +204,12 @@ export default function Home() {
           setPaymentStatus(data.status);
         }
       } catch {
-        // ignorar erros aqui
+        // ignorar erros
       }
     }
 
     if (paymentStatus === "pending") {
-      const interval = setInterval(checkStatus, 10000); // a cada 10s
+      const interval = setInterval(checkStatus, 10000);
       return () => clearInterval(interval);
     }
   }, [paymentId, paymentStatus]);
@@ -311,14 +318,17 @@ export default function Home() {
                       className={styles.ticketEmailInput}
                     />
 
+                    <p className={styles.hauntedShadow}>
+                      💰 Valor: <strong> R$ {calculatePrice(ticketCount)}</strong>
+                    </p>
+
                     <button type="submit" className={styles.payButton}>🎃 PAGAR</button>
                     <button type="button" className={styles.closeFormButton} onClick={() => setState("idle")}>✕ Fechar</button>
                   </form>
                 ) : (
                   <div className={`${styles.ticketText} ${ticketTextAnimationClass}`}>
                     <h3>🎟️ INGRESSO — Para quem não teme a escuridão</h3>
-                    <p className={styles.scaryShake}>👻 PROMOÇÃO LIMITADA !</p>
-                    <p className={styles.hauntedShadow}>💰 Apenas <strong> R$ 54.99</strong></p>
+                    <p className={styles.hauntedShadow}>💰 R$ {calculatePrice(ticketCount)}</p>
                   </div>
                 )}
               </div>
