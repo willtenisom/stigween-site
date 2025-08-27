@@ -328,8 +328,7 @@ export default function Home() {
                   </form>
                 ) : (
                   <div className={`${styles.ticketText} ${ticketTextAnimationClass}`}>
-                    <h3>🎟️ INGRESSO — Para quem não teme a escuridão</h3>
-                    <p className={styles.hauntedShadow}>💰 R$ {calculatePrice(ticketCount)}</p>
+                    <h3>🎟️ AQUI ESTÁ O INGRESSO — Para quem não teme a escuridão</h3>
                   </div>
                 )}
               </div>
