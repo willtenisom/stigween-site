@@ -1,9 +1,6 @@
-/* styles/Home.module.css */
-
 .pageWrapper {
   min-height: 100vh;
   position: relative;
-  /* cor e fonte já no global */
 }
 
 .header {
@@ -41,7 +38,7 @@
   flex-direction: row;
   gap: 20px;
   padding: 20px;
-  justify-content: center; /* para centralizar horizontalmente */
+  justify-content: center; 
 }
 
 .mainLeft {
@@ -53,7 +50,7 @@
 @media (max-width: 768px) {
   .mainContent {
     flex-direction: column;
-    align-items: center; /* centralizar itens verticalmente */
+    align-items: center; 
   }
 
   .mainLeft {
@@ -103,15 +100,15 @@
     /* Já está translúcida */
     background-color: rgba(26, 26, 26, 0.8);
     backdrop-filter: blur(2px);
-     overflow: hidden; /* impede que o conteúdo ultrapasse a div pai no mobile */
+     overflow: hidden; 
 
     /* Tamanho */
     width: 90%;
-    max-width: 350px; /* reduzido */
+    max-width: 350px; 
     padding: 10px;
     font-size: 14px;
 
-    /* Título dentro dela */
+    
   }
 
   .eventoBox h2 {
@@ -193,7 +190,7 @@
 /* Mobile */
 @media (max-width: 500px) {
   .catContainer {
-    height: 100px; /* altura reduzida para mobile */
+    height: 100px; 
   }
 
   .catImage {
@@ -202,7 +199,7 @@
 
   /* Ajuste da posição dos olhos só no mobile */
   .leftEye {
-    top: 95%; /* altura maior no mobile */
+    top: 95%; 
     left: 43%;
   }
   .rightEye {
@@ -240,27 +237,27 @@
 .eventoBox h2 {
   font-size: 28px;
   margin-bottom: 12px;
-  color: #ff7518; /* laranja vibrante */
+  color: #ff7518; 
   text-align: center;
-  text-shadow: 1px 1px 2px #a33c00; /* sombra para destaque */
+  text-shadow: 1px 1px 2px #a33c00; 
 }
 
 .eventoBox p,
 .eventoBox .ticketText p {
   font-size: 16px;
   margin: 6px 0;
-  color: #ffb347; /* dourado suave */
+  color: #ffb347; 
   line-height: 1.4;
   text-align: center;
-  text-shadow: 0 0 3px #7a3a00; /* sombra leve para leitura */
+  text-shadow: 0 0 3px #7a3a00; 
 }
 
 .eventoBox .ticketText h3 {
   font-size: 22px;
   margin-bottom: 8px;
-  color: #ff9e3e; /* laranja dourado */
+  color: #ff9e3e; 
   text-align: center;
-  text-shadow: 1px 1px 2px #803300; /* sombra para profundidade */
+  text-shadow: 1px 1px 2px #803300; 
 }
 
 
@@ -273,7 +270,7 @@
     width: 90%;
     max-width: 350px;
     padding: 10px;
-    font-size: 12px; /* texto base menor */
+    font-size: 12px; 
     
     display: flex;
     flex-direction: column;
@@ -281,7 +278,7 @@
   }
 
   .eventoBox h2 {
-    font-size: 14px; /* título menor */
+    font-size: 14px; 
     color: #ff7518;
     text-shadow: 1px 1px 2px #a33c00;
     text-align: center;
@@ -315,21 +312,21 @@
   .ticketText {
     margin: 0;
     padding: 0;
-    font-size: 12px; /* texto menor */
+    font-size: 12px; 
     color: #ffb347;
     text-shadow: 0 0 3px #7a3a00;
   }
 
   .ticketText h3 {
     margin-bottom: 5px;
-    font-size: 14px; /* título menor */
+    font-size: 14px; 
     color: #ff9e3e;
     text-shadow: 1px 1px 2px #803300;
   }
 
   .ticketText p {
     margin: 2px 0;
-    font-size: 12px; /* texto menor */
+    font-size: 12px; 
     color: #ffb347;
     text-shadow: 0 0 3px #7a3a00;
   }
@@ -426,7 +423,7 @@
   .ticketBoxForm {
     width: 90%;
     max-width: 350px;
-    min-height: auto; /* deixa altura fluir conforme conteúdo */
+    min-height: auto; 
     margin: 10px auto;
     border-radius: 25px;
     box-shadow: 0 0 30px #ff7518, inset 0 0 20px #a33c00;
@@ -437,7 +434,7 @@
     align-items: center;
     justify-content: flex-start;
     box-sizing: border-box;
-    overflow: visible; /* evita cortes de conteúdo */
+    overflow: visible; 
     transition: all 0.4s ease;
   }
 
@@ -529,7 +526,7 @@
   font-size: 1rem;
   margin-bottom: 0.8rem;
   user-select: none;
-  align-items: center;  /* centraliza */
+  align-items: center;  
 }
 
 .ticketQuantitySelector {
@@ -539,7 +536,7 @@
   border: 2px solid #ff7518;
   border-radius: 6px;
   overflow: hidden;
-  width: 100px; /* menor largura */
+  width: 100px; 
   background-color: #1a1a1a;
   box-shadow: 0 0 8px #ff7518aa;
   justify-content: center;
@@ -591,6 +588,7 @@
   box-shadow: 0 0 10px #ffa040aa;
 }
 
+
 .payButton {
   background-color: #ff7518;
   border: none;
@@ -635,7 +633,7 @@
    Faz a sombra da mensagem "tremeluzir", simulando uma aura assombrada */
 .eventoBox p.hauntedShadow {
   animation: hauntedShadow 2s infinite alternate ease-in-out;
-  color: #ff7518;
+  color: #910000;
   text-shadow:
     0 0 5px #ff7518,
     0 0 10px #ff7518,
@@ -724,7 +722,7 @@
 .eventoBox p.scaryShake {
   color: #ff7518;
   animation: scaryShake 1.2s infinite ease-in-out;
-  display: inline-block; /* necessário para aplicar transform */
+  display: inline-block; 
 }
 
 @keyframes scaryShake {

@@ -134,7 +134,7 @@ export default function Home() {
         body: JSON.stringify({
           title: "Ingresso Stigween",
           quantity: ticketCount,
-          price: calculatePrice(ticketCount), // preço atualizado
+          price: calculatePrice(ticketCount), 
           email,
           names: ticketNames,
           clientId: clientId.current,
@@ -204,7 +204,6 @@ export default function Home() {
           setPaymentStatus(data.status);
         }
       } catch {
-        // ignorar erros
       }
     }
 
@@ -263,7 +262,6 @@ export default function Home() {
             <div className={styles.eventoBox}>
               <h2>🕸️ Grande Evento Stigween</h2>
               <p className={`${styles.dynamicPhrase} ${getPhraseAnimationClass(phrase)}`}>{phrase}</p>
-              <p className={styles.hauntedShadow}>Venda começa em: <strong>10/07</strong></p>
               <p className={styles.flicker}>Data do evento: <strong>01/11</strong></p>
 
               <div className={styles.catContainer}>
@@ -318,9 +316,12 @@ export default function Home() {
                       className={styles.ticketEmailInput}
                     />
 
-                    <p className={styles.hauntedShadow}>
-                      💰 Valor: <strong> R$ {calculatePrice(ticketCount)}</strong>
+                   <p className={styles.hauntedShadow}>
+                      💰 Valor unitário: R$ {firstLotPrice} <br />
+                      💰 Promoção Casadinha: 2 ingressos por R$ {couplePrice} <br />
+                      <strong>💵 Total: R$ {calculatePrice(ticketCount)}</strong>
                     </p>
+
 
                     <button type="submit" className={styles.payButton}>🎃 PAGAR</button>
                     <button type="button" className={styles.closeFormButton} onClick={() => setState("idle")}>✕ Fechar</button>
