@@ -28,8 +28,8 @@ export default function Home() {
   const meowAudio = useRef(null);
 
   
-  const firstLotPrice = 70; 
-  const couplePrice = 130;  
+  const firstLotPrice = 60; 
+  const couplePrice = 110;  
 
   const calculatePrice = (quantity) => {
     if (quantity === 1) return firstLotPrice;
