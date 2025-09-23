@@ -6,7 +6,6 @@ export const config = {
   api: { bodyParser: false },
 };
 
-// Configuração do transporter de e-mail
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
@@ -17,11 +16,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Função para envio de e-mail
-async function sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends) {
+async function sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends, couponData) {
   const friendsList = buyerFriends.filter(
     (friend) => friend.trim().toLowerCase() !== payerName.trim().toLowerCase()
   );
+
+  const couponInfo = couponData.code || couponData.amount > 0 
+    ? `Cupom: ${couponData.code || "N/A"} (${couponData.type}) - Valor: R$ ${(couponData.amount / 100).toFixed(2)}`
+    : "Nenhum cupom utilizado";
 
   const textEmail = `
 💰 Novo pagamento aprovado!
@@ -32,6 +34,7 @@ Nome do pagador: ${payerName}
 E-mail do pagador: ${payerEmail}
 External Reference: ${externalReference}
 Amigos: ${friendsList.length > 0 ? friendsList.join(", ") : "nenhum"}
+${couponInfo}
   `.trim();
 
   try {
@@ -47,8 +50,7 @@ Amigos: ${friendsList.length > 0 ? friendsList.join(", ") : "nenhum"}
   }
 }
 
-// Função para envio ao Google Sheets
-async function sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now) {
+async function sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now, couponData) {
   const friendsList = buyerFriends.filter(
     (friend) => friend.trim().toLowerCase() !== payerName.trim().toLowerCase()
   );
@@ -63,6 +65,10 @@ async function sendToSheets(paymentId, payerName, payerEmail, externalReference,
         externalReference,
         friends: friendsList,
         paymentDate: now.toISOString(),
+        couponCode: couponData.code || "",
+        couponAmount: couponData.amount || 0,
+        couponType: couponData.type || "",
+        paymentId: paymentId,
       }),
     });
 
@@ -77,7 +83,6 @@ async function sendToSheets(paymentId, payerName, payerEmail, externalReference,
   }
 }
 
-// Webhook handler
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });
@@ -90,7 +95,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "JSON inválido" });
   }
 
-  // Suporta body.data.id (Postman) ou body.id (MP real)
   const paymentId = body?.data?.id || body?.id;
   if (!paymentId) {
     return res.status(400).json({ error: "Campos obrigatórios faltando" });
@@ -98,7 +102,6 @@ export default async function handler(req, res) {
 
   console.log("[INFO] Webhook recebido, buscando detalhes do pagamento:", paymentId);
 
-  // Busca detalhes do pagamento no Mercado Pago
   let payment;
   try {
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
@@ -122,8 +125,6 @@ export default async function handler(req, res) {
   const metadata = payment?.metadata || {};
   const paymentStatus = payment?.status;
 
-  const payerName = `${payerFirstName} ${payerLastName}`.trim();
-
   let buyerFriends = [];
   try {
     const parsed = JSON.parse(metadata.buyer_friends || "[]");
@@ -131,6 +132,65 @@ export default async function handler(req, res) {
   } catch {
     console.warn("[WARN] buyer_friends inválido");
   }
+  
+  let payerName = `${payerFirstName} ${payerLastName}`.trim();
+  
+  console.log(`[DEBUG] Nome extraído do MP: "${payerName}" (first_name: "${payerFirstName}", last_name: "${payerLastName}")`);
+  
+  if (!payerName) {
+    if (buyerFriends.length > 0) {
+      payerName = buyerFriends[0];
+      console.log(`[DEBUG] Nome extraído do primeiro amigo (pagador): "${payerName}"`);
+    }
+    
+    if (!payerName) {
+      payerName = payment?.payer?.name || "";
+      console.log(`[DEBUG] Nome do campo payer.name: "${payerName}"`);
+    }
+    
+    if (!payerName) {
+      payerName = "Cliente";
+      console.log(`[DEBUG] Usando nome genérico: "${payerName}"`);
+    }
+  }
+  
+  console.log(`[INFO] Nome final do pagador: "${payerName}"`);
+
+  const couponData = {
+    code: "",
+    amount: 0,
+    type: ""
+  };
+
+
+  if (payment?.coupon_amount && payment.coupon_amount > 0) {
+    couponData.amount = payment.coupon_amount;
+    couponData.type = "coupon";
+  }
+  
+  if (payment?.discount_amount && payment.discount_amount > 0) {
+    couponData.amount = payment.discount_amount;
+    couponData.type = "discount";
+  }
+
+  couponData.code = metadata.coupon_code || 
+                    metadata.promotional_code || 
+                    metadata.discount_code || 
+                    payment?.coupon_id || 
+                    payment?.campaign_id || 
+                    "";
+
+  if (!couponData.code && metadata) {
+    Object.keys(metadata).forEach(key => {
+      if (key.toLowerCase().includes('cupom') || 
+          key.toLowerCase().includes('coupon') || 
+          key.toLowerCase().includes('promocional') || 
+          key.toLowerCase().includes('desconto')) {
+        couponData.code = metadata[key];
+      }
+    });
+  }
+
 
   if (paymentStatus !== "approved") {
     console.log(`[INFO] Pagamento não aprovado, ignorando. Status: ${paymentStatus}`);
@@ -139,7 +199,6 @@ export default async function handler(req, res) {
 
   const now = new Date();
 
-  // Salva no MongoDB
   try {
     const db = (await clientPromise).db();
     const existing = await db.collection("pagamentos").findOne({ paymentId });
@@ -169,9 +228,12 @@ export default async function handler(req, res) {
     console.error("[ERROR] MongoDB:", err);
   }
 
-  // Envia notificações
-  await sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends);
-  await sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now);
+  if (couponData.code || couponData.amount > 0) {
+    console.log("[INFO] Cupom encontrado:", couponData);
+  }
+
+  await sendPaymentEmail(paymentId, payerName, payerEmail, externalReference, buyerFriends, couponData);
+  await sendToSheets(paymentId, payerName, payerEmail, externalReference, buyerFriends, now, couponData);
 
   return res.status(200).json({ message: "Processado", paymentId, status: paymentStatus });
 }

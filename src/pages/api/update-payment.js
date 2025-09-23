@@ -32,15 +32,29 @@ export default async function handler(req, res) {
     const db = client.db();
     const collection = db.collection("pagamentos");
 
+    let payerName = `${paymentData.payer?.first_name || ""} ${paymentData.payer?.last_name || ""}`.trim();
+    
+    if (!payerName && paymentData.metadata?.buyer_friends) {
+      try {
+        const parsed = JSON.parse(paymentData.metadata.buyer_friends || "[]");
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          payerName = parsed[0]; 
+        }
+      } catch {
+      }
+    }
+    
+    if (!payerName) {
+      payerName = paymentData.payer?.name || "Cliente";
+    }
+
     await collection.updateOne(
       { paymentId: id },
       {
         $set: {
           status: paymentData.status,
           payerEmail: paymentData.payer?.email || null,
-          payerName:
-            `${paymentData.payer?.first_name || ""} ${paymentData.payer?.last_name || ""}`.trim() ||
-            null,
+          payerName: payerName || null,
           externalReference: paymentData.external_reference || null,
           metadata: paymentData.metadata || {},
           updatedAt: new Date(),

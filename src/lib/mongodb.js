@@ -6,7 +6,7 @@ if (!uri) throw new Error("Por favor defina MONGODB_URI no .env");
 const options = {
   ssl: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 60000, // 1 minuto
+  serverSelectionTimeoutMS: 60000, 
 };
 
 let client;

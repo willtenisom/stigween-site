@@ -21,20 +21,39 @@ export default function Home() {
   const [ticketNames, setTicketNames] = useState([""]);
   const [paymentId, setPaymentId] = useState(null);
 
+  const [coupon, setCoupon] = useState("");
+  const [isCouponValid, setIsCouponValid] = useState(false);
+
   const clientId = useRef(uuidv4());
 
   const leftEyeRef = useRef(null);
   const rightEyeRef = useRef(null);
   const meowAudio = useRef(null);
 
-  
   const firstLotPrice = 60; 
   const couplePrice = 110;  
+
+  const promoters = ["ABOBORA", "MORCEGO", "CAVEIRA", "FANTASMA", "BRUXA"];
+  const discountRate = 0.05; 
 
   const calculatePrice = (quantity) => {
     if (quantity === 1) return firstLotPrice;
     if (quantity % 2 === 0) return (quantity / 2) * couplePrice;
     return Math.floor(quantity / 2) * couplePrice + firstLotPrice;
+  };
+
+  const finalPrice = isCouponValid
+    ? calculatePrice(ticketCount) * (1 - discountRate)
+    : calculatePrice(ticketCount);
+
+  const applyCoupon = () => {
+    if (promoters.includes(coupon.toUpperCase())) {
+      setIsCouponValid(true);
+      alert(`🎃 Cupom ${coupon.toUpperCase()} aplicado! Desconto de 5% ativado.`);
+    } else {
+      setIsCouponValid(false);
+      alert("👻 Esse feitiço não existe... cupom inválido!");
+    }
   };
 
   useEffect(() => {
@@ -69,10 +88,16 @@ export default function Home() {
   useEffect(() => {
     if (!router.isReady) return;
     const { status, payment_id } = router.query;
+    
+    console.log("[INFO] Router query params:", { status, payment_id });
+    
     if (payment_id) {
+      console.log(`[INFO] Payment ID recebido: ${payment_id}`);
       setPaymentId(payment_id);
     }
+    
     if (["success", "failure", "pending"].includes(status)) {
+      console.log(`[INFO] Status do pagamento recebido via URL: ${status}`);
       setPaymentStatus(status);
       const nextQuery = { ...router.query };
       delete nextQuery.status;
@@ -134,10 +159,11 @@ export default function Home() {
         body: JSON.stringify({
           title: "Ingresso Stigween",
           quantity: ticketCount,
-          price: calculatePrice(ticketCount), 
+          price: finalPrice, 
           email,
           names: ticketNames,
           clientId: clientId.current,
+          coupon: isCouponValid ? coupon.toUpperCase() : null, 
         }),
       });
       if (!res.ok) throw new Error("Erro ao criar preferência");
@@ -197,21 +223,31 @@ export default function Home() {
 
     async function checkStatus() {
       try {
-        const res = await fetch(`/api/payment-status?clientId=${clientId.current}`);
+        const url = paymentId 
+          ? `/api/payment-status?paymentId=${paymentId}&clientId=${clientId.current}`
+          : `/api/payment-status?clientId=${clientId.current}`;
+          
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Erro ao buscar status");
         const data = await res.json();
         if (data.status && data.status !== paymentStatus) {
+          console.log(`[INFO] Status do pagamento atualizado: ${data.status}`);
           setPaymentStatus(data.status);
         }
-      } catch {
+      } catch (err) {
+        console.warn("[WARN] Erro ao verificar status do pagamento:", err.message);
       }
+    }
+
+    if (!paymentStatus) {
+      checkStatus();
     }
 
     if (paymentStatus === "pending") {
       const interval = setInterval(checkStatus, 10000);
       return () => clearInterval(interval);
     }
-  }, [paymentId, paymentStatus]);
+  }, [paymentId, clientId.current, paymentStatus]);
 
   return (
     <div className={styles.pageWrapper}>
@@ -316,12 +352,26 @@ export default function Home() {
                       className={styles.ticketEmailInput}
                     />
 
-                   <p className={styles.hauntedShadow}>
+                    {/* 🎃 Campo do Cupom */}
+                    <div className={styles.couponBox}>
+                      <input
+                        type="text"
+                        placeholder="Digite seu código assustador..."
+                        value={coupon}
+                        onChange={(e) => setCoupon(e.target.value)}
+                        className={styles.ticketNameInput}
+                      />
+                      <button type="button" onClick={applyCoupon} className={styles.payButton}>
+                        🕸️ Aplicar Cupom
+                      </button>
+                    </div>
+
+                    <p className={styles.hauntedShadow}>
                       💰 Valor unitário: R$ {firstLotPrice} <br />
                       💰 Promoção Casadinha: 2 ingressos por R$ {couplePrice} <br />
-                      <strong>💵 Total: R$ {calculatePrice(ticketCount)}</strong>
+                      {isCouponValid && <span>🎁 Cupom {coupon.toUpperCase()} ativado (5% OFF)</span>} <br />
+                      <strong>💵 Total: R$ {finalPrice.toFixed(2)}</strong>
                     </p>
-
 
                     <button type="submit" className={styles.payButton}>🎃 PAGAR</button>
                     <button type="button" className={styles.closeFormButton} onClick={() => setState("idle")}>✕ Fechar</button>
@@ -341,3 +391,4 @@ export default function Home() {
     </div>
   );
 }
+

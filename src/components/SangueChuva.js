@@ -12,7 +12,6 @@ export default function SangueChuva() {
           left: Math.random() * 100 + "%",
           duration: 3 + Math.random() * 3,
         };
-        // mantém só até 30 gotas
         const novasGotas = [...old, novaGota].slice(-30);
         return novasGotas;
       });

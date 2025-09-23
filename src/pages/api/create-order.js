@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método não permitido" });
   }
 
-  const { title, quantity, price, names, email, clientId } = req.body ?? {};
+  const { title, quantity, price, names, email, clientId, coupon } = req.body ?? {};
 
   if (
     !title || typeof title !== "string" ||
@@ -27,32 +27,50 @@ export default async function handler(req, res) {
 
     console.log(`📦 Criando preferência para: ${payerName} <${email}>`);
 
-    const result = await preference.create({
-      body: {
-       items: [
-    {
-        title,
-         quantity: 1, 
-         unit_price: price,
-         urrency_id: "BRL",
-     },
-   ],
-        payer: {
-          name: payerName,
-          email,
+    const envBase = process.env.NEXT_PUBLIC_BASE_URL || process.env.SITE_URL || "";
+    const headerProto = req.headers["x-forwarded-proto"] || (req.headers.origin ? new URL(req.headers.origin).protocol.replace(":", "") : "");
+    const headerHost = req.headers["x-forwarded-host"] || req.headers.host || "";
+    const inferredBase = headerProto && headerHost ? `${headerProto}://${headerHost}` : "";
+    const baseUrl = (envBase || inferredBase || "http://localhost:3000").replace(/\/$/, "");
+
+    const isLocalhost = /localhost|127\.0\.0\.1/i.test(baseUrl);
+
+    const backUrls = {
+      success: `${baseUrl}/?status=success`,
+      failure: `${baseUrl}/?status=failure`,
+      pending: `${baseUrl}/?status=pending`,
+    };
+
+    const preferenceBody = {
+      items: [
+        {
+          title,
+          quantity: 1,
+          unit_price: price,
+          currency_id: "BRL",
         },
-        back_urls: {
-          success: "https://stigween.vercel.app/?status=success",
-          failure: "https://stigween.vercel.app/?status=failure",
-          pending: "https://stigween.vercel.app/?status=pending"
-        },
-        notification_url: "https://stigween.vercel.app/api/webhook",
-        auto_return: "approved",
-        metadata: {
-          buyer_friends: JSON.stringify(names),
-        },
-        external_reference: clientId || email,
+      ],
+      payer: {
+        name: payerName,
+        email,
       },
+      back_urls: backUrls,
+      notification_url: `${baseUrl}/api/webhook`,
+      metadata: {
+        buyer_friends: JSON.stringify(names),
+        coupon_code: coupon || "",
+        promotional_code: coupon || "",
+      },
+      external_reference: clientId || email,
+    };
+
+    // Mercado Pago rejeita auto_return quando back_urls não são públicos (ex.: localhost)
+    if (!isLocalhost) {
+      preferenceBody.auto_return = "approved";
+    }
+
+    const result = await preference.create({
+      body: preferenceBody,
     });
 
     if (!result?.id || !result?.init_point) {
