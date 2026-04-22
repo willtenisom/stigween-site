@@ -78,11 +78,16 @@ npm install
 3️⃣ Configure as variáveis de ambiente:
 Crie um arquivo `.env.local` com:
 ```env
-MERCADO_PAGO_ACCESS_TOKEN=seu_token_mercado_pago
-EMAIL_USER=seu_email@gmail.com
-EMAIL_PASS=sua_senha_ou_app_password
-EMAIL_TO=email_organizador@gmail.com
+MP_ACCESS_TOKEN=seu_token_mercado_pago
+MONGODB_URI=sua_string_de_conexao_mongodb
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=seu_email@gmail.com
+SMTP_PASS=sua_senha_ou_app_password
+CONFIRMATION_EMAIL_TO=email_organizador@gmail.com
 SHEETS_WEBHOOK_URL=link do seu formulário
+NEXT_PUBLIC_BASE_URL=https://seu-projeto.vercel.app
 ```
 
 4️⃣ Inicie o servidor:
@@ -108,12 +113,12 @@ http://localhost:3000
 ## 📝 Notas sobre integrações
 
 - 💰 **Mercado Pago**: 
-  - Endpoint `/api/pagar.js` cria um pagamento
+  - Endpoint `/api/create-order.js` cria um pagamento
   - Webhook `/api/webhook.js` recebe notificações do status do pagamento
   - Outros arquivos relacionados: `create-order.js`, `update-payment.js`, `check-payment.js`
 - 📧 **E-mail**:
   - Envia automaticamente os dados preenchidos no formulário para o e-mail do organizador.
-  - Usa `EMAIL_USER` e `EMAIL_PASS` do `.env.local` para autenticar.
+  - Usa `SMTP_USER` e `SMTP_PASS` do `.env.local` para autenticar.
 - 📜 **Formulário**:
   - Formulário integrado com o webhook, automatizado com o nome dos pagantes.
 
